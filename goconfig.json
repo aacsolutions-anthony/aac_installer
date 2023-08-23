@@ -5,5 +5,6 @@
 	"label": "YOUR_LABEL_HERE (edge=edghts_xxxx_)",
 	"protocol": "http / https",
 	"port": 80
+	"licensename": "pulselive.lic"
 }
 
