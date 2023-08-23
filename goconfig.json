@@ -4,7 +4,9 @@
 	"authtoken": "YOUR_AUTH_TOKEN_HERE",
 	"label": "YOUR_LABEL_HERE (edge=edghts_xxxx_)",
 	"protocol": "http / https",
-	"port": 80
+	"port": 80,
 	"licensename": "pulselive.lic"
+	"siteID": "1234",
+	"deviceCode": "5678"
 }
 
