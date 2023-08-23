@@ -1,0 +1,9 @@
+
+
+{
+	"authtoken": "YOUR_AUTH_TOKEN_HERE",
+	"label": "YOUR_LABEL_HERE (edge=edghts_xxxx_)",
+	"protocol": "http / https",
+	"port": 80
+}
+
