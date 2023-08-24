@@ -1,59 +1,21 @@
 package main
 
-/*
-
-
-ADDITIONS:
-
-	1>Переместить папку резервных копий SQL
-	2>Проверить извлечение содержимого
-	3>Упаковать внутренний файл в 'Advanced Installer'
-	4>Получить тихие установки и запустить их внутри новой функции
-
-MOVE SQL BACKUPS FOLDER
-CHECK EXTRACT CONTENTS
-PACKAGE INSIDE ADVANCED INSTALLER
-GET SILENT INSTALLS AND RUN THEM INSIDE A NEW FUNCTION
-func silentInstall (){
-	postman
-	erlang
-	notepad ++
-	C/C++ RUNTIME
-
-}
-
-Other installs such as Microsoft SQL and studio must be done manually.
-func sqlServer BAK/SQLI (){
-	chk// call after SQLServer() main install
-	chk// call after SQL backups folder has moved to C:/X
-
-
-
-}
-
-func mainInstalls (){
-	SQLServer()
-
-
-}
-
-REFACTOR TO USE LESS NEWLINES AND PROCESS STARTS, POSSIBLE MULTITHREAD (MAX 4 THREADS / DAEMONS / DAEMONS NEED EXTRA CHECKS) UPDATE ON V2.0.0
-
-
-
-GO LANG
+```
+GO LANG 
 AAC INSTALLER SOURCE CODE
 TO BE PACKAGED INSIDE OF ADVANCED INSTALLER
          ____
         / _\ \
-      .`\/  \ \
-    ,`   \   \ \
-     / /-`    \ \ .
-    / /       ,\ `|
-   / /        `-._|
-  / /_.`|________\_\
+      .'\/  \ \
+    ,'   \   \ \
+     / /-'    \ \ .
+    / /       ,\ '|
+   / /        '-._|
+  / /_.'|________\_\
   \/_<  ___________/
-GO-   `.|
+GO-   '.|
+
+```
 
 
 // The author of this code is not affiliated with, endorsed by, or associated with Microsoft or any of its subsidiaries or affiliates.
@@ -62,13 +24,14 @@ GO-   `.|
 //AUTHOR        : ANTHONY GRACE
 //COMPANY       : AAC SOLUTIONS PTY LTD
 //DEPARTMENT    : IT TECHNICIAN
-//COMP / VERSION: BETA-0.0.2
+//COMP / VERSION: BETA-0.0.1
 //
-// PRG: AAC INSTALLER
-// PUR: Install and automate the server setup checklist.
+// PRG: AAC INSTALLER 
+// PUR: Install and automate the server setup checklist. 
 //
 
-*/
+
+
 import (
 	"crypto/rand"
 	"crypto/rsa"
@@ -76,6 +39,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"os"
@@ -83,19 +47,6 @@ import (
 	"strings"
 	"time"
 )
-
-func pullconfig() Config {
-	configFile := "goconfig.json"
-	var config Config
-	file, err := os.ReadFile(configFile)
-	if err != nil {
-		log.Fatalf("Failed to read config file %s: %v", configFile, err)
-	}
-	if err := json.Unmarshal(file, &config); err != nil {
-		log.Fatalf("Failed to unmarshal JSON: %v", err)
-	}
-	return config
-}
 
 type Config struct {
 	AuthToken   string `json:"authtoken"`
@@ -105,7 +56,7 @@ type Config struct {
 	RegistryKey string `json:"registryKey"`
 }
 
-var csr = "cert.csr"
+var pem = "cert.pem"
 var key = "cert.key"
 
 func buildPowerShellScript(lines ...string) string {
@@ -120,34 +71,33 @@ func runPowerShellCommand(command string) {
 	}
 }
 
-func powershellList(config Config) {
-
-	fmt.Println("COPYING PULSE LIVE PATCH: ")
+func powershellList() {
+	fmt.Println("COPYING PULSE LIVE PATCH: \n")
 	runPowerShellCommand(`Copy-Item -Path .\PATCH\Server\* -Destination 'C:\program files\pulselive' -Recurse -Force`)
 	runPowerShellCommand(`Copy-Item -Path .\PATCH\Max\* -Destination 'C:\program files\pulselive\max' -Recurse -Force`)
 	runPowerShellCommand(`Expand-Archive -Path .\PATCH\Client.zip -DestinationPath 'c:\inetpub\wwwroot\pulselive' -Force`)
 	time.Sleep(1 * time.Second)
 
-	fmt.Println("PERFORMING IIS CONFIGURATION: ")
+	fmt.Println("PERFORMING IIS CONFIGURATION: \n ")
 	runPowerShellCommand(`Import-Module WebAdministration`)
 	runPowerShellCommand(`Set-ItemProperty -Path 'IIS:\AppPools\DefaultAppPool' -Name Recycling.periodicRestart.schedule -Value @{value='06:00:00','09:00:00'}`)
 	runPowerShellCommand(`New-WebApplication -Name "PulseLive" -Site "Default Web Site" -PhysicalPath 'c:\inetpub\wwwroot\pulselive' -ApplicationPool "DefaultAppPool"`)
 	time.Sleep(1 * time.Second)
 
-	fmt.Println("CONFIGURING REGISTRY: ")
+	fmt.Println("CONFIGURING REGISTRY: \n")
 	runPowerShellCommand(`New-Item -Path 'HKLM:\Software\AAC\L' -Force`)
 	runPowerShellCommand(fmt.Sprintf(`New-ItemProperty -Path 'HKLM:\Software\AAC\L' -Name 'K' -Value '%s' -PropertyType 'String' -Force`, config.RegistryKey))
 	time.Sleep(1 * time.Second)
 
-	fmt.Println("APPLYING PULSELIVE LICENSE: ")
+	fmt.Println("APPLYING PULSELIVE LICENSE: \n")
 	runPowerShellCommand(`Copy-Item -Path .\pulselive.lic -Destination 'c:\program files\pulselive' -Force`)
 	time.Sleep(1 * time.Second)
 
-	fmt.Println("ADJUSTING POWER SETTINGS: ")
+	fmt.Println("ADJUSTING POWER SETTINGS: \n")
 	runPowerShellCommand(`powercfg /change -standby-timeout-ac 0`)
 	time.Sleep(1 * time.Second)
 
-	fmt.Println("CHANGING FOLDER PERMS: ")
+	fmt.Println("CHANGING FOLDER PERMS: \n")
 	runPowerShellCommand(`$acl = Get-Acl 'c:\inetpub\wwwroot\pulselive\CreatedReports'; $permission = 'IIS_IUSRS','FullControl','Allow'; $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule $permission; $acl.SetAccessRule($accessRule); $acl | Set-Acl 'c:\inetpub\wwwroot\pulselive\CreatedReports'`)
 	runPowerShellCommand(`$acl = Get-Acl 'c:\inetpub\wwwroot\pulselive\Logs'; $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule $permission; $acl.SetAccessRule($accessRule); $acl | Set-Acl 'c:\inetpub\wwwroot\pulselive\Logs'`)
 }
@@ -177,13 +127,22 @@ func genCert() {
 	if err != nil {
 		log.Fatalf("create cert failed %#v", err)
 	}
-	log.Println("save", csr)
-	os.WriteFile(csr, ca_b, 0644)
+	log.Println("save", pem)
+	ioutil.WriteFile(pem, ca_b, 0644)
 	log.Println("save", key)
-	os.WriteFile(key, x509.MarshalPKCS1PrivateKey(priv), 0644)
+	ioutil.WriteFile(key, x509.MarshalPKCS1PrivateKey(priv), 0644)
 }
 
-func InstallAndConfigureNgrok(config Config) {
+func InstallAndConfigureNgrok() {
+	configFile := "goconfig.json"
+	var config Config
+	file, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		log.Fatalf("Failed to read config file %s: %v", configFile, err)
+	}
+	if err := json.Unmarshal(file, &config); err != nil {
+		log.Fatalf("Failed to unmarshal JSON: %v", err)
+	}
 
 	fmt.Printf("Welcome to the AAC Solutions installer to install and configure ngrok software.\n")
 	time.Sleep(1 * time.Second)
@@ -203,24 +162,27 @@ func InstallAndConfigureNgrok(config Config) {
 	fmt.Print("Would you like to change these values? (yes/no): ")
 	time.Sleep(1 * time.Second)
 
-	var response string
-	fmt.Scanln(&response)
-	response = strings.ToLower(response)
+	
+is the following correct, how can i check for both cases? 
+	
+var response string
+fmt.Scanln(&response)
+response = strings.ToLower(response)
 
-	validResponses := []string{"yes", "y"}
-	for _, validResponse := range validResponses {
-		if response == validResponse {
-			fmt.Print("Enter new authtoken: ")
-			fmt.Scanln(&config.AuthToken)
-			fmt.Print("Enter new label: ")
-			fmt.Scanln(&config.Label)
-			fmt.Print("Enter new protocol: ")
-			fmt.Scanln(&config.Protocol)
-			fmt.Print("Enter new port: ")
-			fmt.Scanln(&config.Port)
-			break
-		}
-	}
+validResponses := []string{"yes", "y"}
+for _, validResponse := range validResponses {
+    if response == validResponse {
+        fmt.Print("Enter new authtoken: ")
+        fmt.Scanln(&config.AuthToken)
+        fmt.Print("Enter new label: ")
+        fmt.Scanln(&config.Label)
+        fmt.Print("Enter new protocol: ")
+        fmt.Scanln(&config.Protocol)
+        fmt.Print("Enter new port: ")
+        fmt.Scanln(&config.Port)
+        break
+    }
+}
 
 	ngrokPath := ".\\ngrok\\ngrok.exe"
 	if _, err := os.Stat(ngrokPath); os.IsNotExist(err) {
@@ -252,18 +214,17 @@ func InstallAndConfigureNgrok(config Config) {
 }
 
 func main() {
-	if _, err := os.ReadFile(csr); err != nil {
-		if _, err := os.ReadFile(key); err != nil {
+	if _, err := io.ReadFile(pem); err != nil {
+		if _, err := io.ReadFile(key); err != nil {
 			log.Println("No certs found, generating new self-signed certs.")
 			genCert()
 		}
 	}
-	config := pullconfig()
-	powershellList(config)
-	InstallAndConfigureNgrok(config)
+
+	InstallAndConfigureNgrok()
 }
 
-/*
+
 //Improvements Made:
 //- Moved the `registryKey` field in the `Config` struct to match the JSON tag name convention.
 //- Reordered the functions to make the code more readable and maintainable.
@@ -277,12 +238,12 @@ func main() {
 //Please note that no bugs were found in the original code provided, so no bug fixing was necessary.
 
 //EXAMPLE JSON
-
+```
 {
 	"authtoken": "",
 	"label": "",
 	"protocol": "",
-    "registryKey": "",
-	"port":
+    "registryKey": "", 
+	"port": 
 }
-*/
+```
