@@ -1,18 +1,10 @@
 package main
 
 /*
-
-
-ADDITIONS:
-
-	1>Переместить папку резервных копий SQL
-	2>Проверить извлечение содержимого
-	3>Упаковать внутренний файл в 'Advanced Installer'
-	4>Получить тихие установки и запустить их внутри новой функции
-
-MOVE SQL BACKUPS FOLDER
-CHECK EXTRACT CONTENTS
-PACKAGE INSIDE ADVANCED INSTALLER
+ADDITIONS TO DO:
+Y MOVE SQL BACKUPS FOLDER
+N CHECK EXTRACT CONTENTS
+N PACKAGE INSIDE ADVANCED INSTALLER
 GET SILENT INSTALLS AND RUN THEM INSIDE A NEW FUNCTION
 func silentInstall (){
 	postman
@@ -21,26 +13,7 @@ func silentInstall (){
 	C/C++ RUNTIME
 
 }
-
 Other installs such as Microsoft SQL and studio must be done manually.
-func sqlServer BAK/SQLI (){
-	chk// call after SQLServer() main install
-	chk// call after SQL backups folder has moved to C:/X
-
-
-
-}
-
-func mainInstalls (){
-	SQLServer()
-
-
-}
-
-REFACTOR TO USE LESS NEWLINES AND PROCESS STARTS, POSSIBLE MULTITHREAD (MAX 4 THREADS / DAEMONS / DAEMONS NEED EXTRA CHECKS) UPDATE ON V2.0.0
-
-
-
 GO LANG
 AAC INSTALLER SOURCE CODE
 TO BE PACKAGED INSIDE OF ADVANCED INSTALLER
@@ -54,26 +27,21 @@ TO BE PACKAGED INSIDE OF ADVANCED INSTALLER
   / /_.`|________\_\
   \/_<  ___________/
 GO-   `.|
-
-
 // The author of this code is not affiliated with, endorsed by, or associated with Microsoft or any of its subsidiaries or affiliates.
-//
 //DATE          : 23/08/2023
 //AUTHOR        : ANTHONY GRACE
 //COMPANY       : AAC SOLUTIONS PTY LTD
 //DEPARTMENT    : IT TECHNICIAN
 //COMP / VERSION: BETA-0.0.2
-//
 // PRG: AAC INSTALLER
 // PUR: Install and automate the server setup checklist.
-//
-
 */
 import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -82,6 +50,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	_ "github.com/denisenkom/go-mssqldb"
 )
 
 func pullconfig() Config {
@@ -98,11 +68,16 @@ func pullconfig() Config {
 }
 
 type Config struct {
-	AuthToken   string `json:"authtoken"`
-	Label       string `json:"label"`
-	Protocol    string `json:"protocol"`
-	Port        int    `json:"port"`
-	RegistryKey string `json:"registryKey"`
+	AuthToken      string `json:"authtoken"`   //abcdefghijklmopqrstuvwxyz
+	Label          string `json:"label"`       //edge_edgheight
+	Protocol       string `json:"protocol"`    //https
+	Port           int    `json:"port"`        //80
+	RegistryKey    string `json:"registryKey"` // 123456
+	Server         string `json:"server"`      //DESKTOP-xxxxx ???
+	User           string `json:"user"`        //pulselive
+	Password       string `json:"password"`    //C:pulselive xxxx ??
+	Database       string `json:"database"`    //C:/localhost?
+	BackupFilePath string `json:"backupfilepath"`
 }
 
 var csr = "cert.csr"
@@ -112,12 +87,87 @@ func buildPowerShellScript(lines ...string) string {
 	return strings.Join(lines, "; ")
 }
 
-func runPowerShellCommand(command string) {
+func runPowerShellCommand(command string) error {
 	cmd := exec.Command("powershell", "-command", command)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatalf("Failed to execute command: %s\nError: %v\n%s\n", command, err, out)
+		log.Printf("Failed to execute command: %s\nError: %v\n%s\n", command, err, out)
+		return err
 	}
+	return nil
+}
+
+func silentInstall() {
+	// URLs for downloading the installers
+	installers := map[string]string{
+		"postman":   "URL_TO_POSTMAN_INSTALLER", // Make sure to replace with the correct URLs
+		"erlang":    "URL_TO_ERLANG_INSTALLER",
+		"notepad++": "URL_TO_NOTEPAD++_INSTALLER",
+		"C/C++":     "URL_TO_C_CPP_RUNTIME_INSTALLER",
+	}
+
+	for name, url := range installers {
+		fmt.Printf("Downloading %s...\n", name)
+		output := name + "_installer.exe"
+
+		// PowerShell script to download the file and display progress with percentage
+		downloadScript := buildPowerShellScript(
+			fmt.Sprintf(`$url = "%s"; $output = "%s"`, url, output),
+			"$wc = New-Object System.Net.WebClient",
+			"$wc.DownloadProgressChanged += { Write-Progress -PercentComplete $_.ProgressPercentage -Status ('Downloading... ' + $_.ProgressPercentage + '%') }",
+			"$wc.DownloadFileAsync($url, $output)",
+			"while ($wc.IsBusy) { Start-Sleep -Milliseconds 100 }",
+		)
+
+		runPowerShellCommand(downloadScript)
+
+		fmt.Printf("Installing %s...\n", name)
+		installCommand := ""
+
+		switch name {
+		case "postman": // Assuming it's an MSI package
+			installCommand = fmt.Sprintf(`Msiexec /i "%s" /qb! /l*v install.log`, output)
+		case "erlang": // Assuming it's an MSI package
+			installCommand = fmt.Sprintf(`Msiexec /i "%s" /qb! /l*v install.log`, output)
+		case "notepad++": // Assuming it's an EXE file
+			installCommand = output + " /S" // You might need to change this based on the specific silent install command for Notepad++
+		case "C/C++": // Assuming it's an EXE file
+			installCommand = output + " /S" // You might need to change this based on the specific silent install command for C/C++ Runtime
+		}
+
+		runPowerShellCommand(installCommand)
+		fmt.Printf("%s installed successfully\n", name)
+	}
+}
+
+func copySQLBackups(config Config) {
+	command := fmt.Sprintf(`Copy-Item -Path .\SQLBACKUPS -Destination '%s' -Recurse -Force`, config.BackupFilePath)
+	if err := runPowerShellCommand(command); err != nil {
+		fmt.Printf("Failed to copy SQLBACKUPS directory to %s\nError: %v\n", config.BackupFilePath, err)
+	} else {
+		fmt.Printf("SQLBACKUPS directory copied successfully to %s\n", config.BackupFilePath)
+	}
+}
+
+func backupDatabase(config Config) error {
+	connString := fmt.Sprintf("server=%s;user id=%s;password=%s;database=%s;", config.Server, config.User, config.Password, config.Database)
+	db, err := sql.Open("sqlserver", connString)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	query := `
+	BACKUP DATABASE ? TO DISK = ?
+	WITH STATS = 10
+	`
+	_, err = db.Exec(query, config.Database, config.BackupFilePath)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Database %s backed up successfully to %s\n", config.Database, config.BackupFilePath)
+	return nil
 }
 
 func powershellList(config Config) {
@@ -252,37 +302,26 @@ func InstallAndConfigureNgrok(config Config) {
 }
 
 func main() {
-	if _, err := os.ReadFile(csr); err != nil {
-		if _, err := os.ReadFile(key); err != nil {
-			log.Println("No certs found, generating new self-signed certs.")
-			genCert()
-		}
+	csrFile, err := os.ReadFile(csr)
+	if err != nil {
+		log.Println("Error reading csr file:", err)
+	} else {
+		log.Println("csr file found.")
+	}
+	keyFile, err := os.ReadFile(key)
+	if err != nil {
+		log.Println("Error reading key file:", err)
+	} else {
+		log.Println("key file found.")
+	}
+	if csrFile == nil && keyFile == nil {
+		log.Println("No certs found, generating new self-signed certs.")
+		genCert()
 	}
 	config := pullconfig()
+	backupDatabase(config)
+	silentInstall()
+	copySQLBackups(config)
 	powershellList(config)
 	InstallAndConfigureNgrok(config)
 }
-
-/*
-//Improvements Made:
-//- Moved the `registryKey` field in the `Config` struct to match the JSON tag name convention.
-//- Reordered the functions to make the code more readable and maintainable.
-//- Rename the `registrydKey` field to `RegistryKey` to make it exported and accessible.
-//- Fixed the missing `config` variable reference in the `InstallAndConfigureNgrok` function.
-//- Moved the `InstallAndConfigureNgrok` function below the other functions to maintain consistency.
-//- Combined the import statements for better readability.
-//- Added comments to the code to improve documentation.
-//- Changed the return statement in the `genCert` function to remove useless `return` statement after `log.Fatalf` call.
-//- Called the `InstallAndConfigureNgrok` function at the end of the `main` function for program execution.
-//Please note that no bugs were found in the original code provided, so no bug fixing was necessary.
-
-//EXAMPLE JSON
-
-{
-	"authtoken": "",
-	"label": "",
-	"protocol": "",
-    "registryKey": "",
-	"port":
-}
-*/
